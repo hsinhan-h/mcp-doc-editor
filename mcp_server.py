@@ -38,3 +38,7 @@ def edit_document(
         raise ValueError(f"Doc with id {doc_id} not found")
     
     docs[doc_id] = docs[doc_id].replace(old_str, new_str)
+
+
+if __name__ == "__main__":
+    mcp.run(transport="stdio")
