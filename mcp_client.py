@@ -37,6 +37,16 @@ class MCPClient:
         result = await self.session().list_tools()
         return result.tools
 
+    async def list_prompts(self) -> list[types.Prompt]:
+        result = await self.session().list_prompts()
+        return result.prompts
+
+    async def get_prompt(
+        self, prompt_name: str, args: dict[str, str]
+    ) -> list[types.PromptMessage]:
+        result = await self.session().get_prompt(prompt_name, args)
+        return result.messages
+
     async def call_tool(
         self, tool_name: str, tool_input: dict
     ) -> types.CallToolResult | None:
