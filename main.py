@@ -55,16 +55,55 @@ async def chat(client: MCPClient, messages: list[dict]) -> str:
         messages.append({"role": "user", "content": tool_results})
 
 
+async def ask(prompt: str) -> str:
+    return (await asyncio.to_thread(input, prompt)).strip()
+
+
+async def run_prompt(client: MCPClient, name: str) -> str | None:
+    """依 MCP prompt 的參數互動詢問使用者,回傳展開後的提示文字;取消則回傳 None。"""
+    prompts = {p.name: p for p in await client.list_prompts()}
+    prompt = prompts.get(name)
+    if prompt is None:
+        print(f"找不到提示 /{name}。輸入 / 查看可用提示。")
+        return None
+
+    args: dict[str, str] = {}
+    for arg in prompt.arguments or []:
+        if arg.name == "doc_id":
+            doc_ids = await client.read_resource("docs://documents")
+            for i, doc_id in enumerate(doc_ids, 1):
+                print(f"  {i}. {doc_id}")
+            choice = await ask("選擇文件編號: ")
+            if not choice.isdigit() or not 1 <= int(choice) <= len(doc_ids):
+                print("已取消。")
+                return None
+            args[arg.name] = doc_ids[int(choice) - 1]
+        else:
+            args[arg.name] = await ask(f"{arg.name}: ")
+
+    messages = await client.get_prompt(name, args)
+    return "\n".join(m.content.text for m in messages if m.content.type == "text")
+
+
 async def main():
     async with MCPClient(command=sys.executable, args=["mcp_server.py"]) as client:
         messages: list[dict] = []
-        print("Document assistant. 輸入 exit 離開。")
+        print("Document assistant. 輸入 / 查看提示,輸入 exit 離開。")
         while True:
-            query = (await asyncio.to_thread(input, "\n> ")).strip()
+            query = await ask("\n> ")
             if query.lower() in ("exit", "quit"):
                 break
             if not query:
                 continue
+            if query.startswith("/"):
+                name = query[1:].strip()
+                if not name:
+                    for p in await client.list_prompts():
+                        print(f"  /{p.name} - {p.description}")
+                    continue
+                query = await run_prompt(client, name)
+                if query is None:
+                    continue
             messages.append({"role": "user", "content": query})
             print(await chat(client, messages))
 
